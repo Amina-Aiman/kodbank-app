@@ -5,7 +5,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node --watch-path=./routes --watch-path=./middleware --watch-path=./db --watch-path=./scripts server.js",
+    "dev": "nodemon --watch routes --watch middleware --watch db --watch scripts --delay 500ms server.js",
     "init-db": "node scripts/init-db.js",
     "seed": "node scripts/seed-data.js"
   },
@@ -17,5 +17,8 @@
     "express": "^4.18.2",
     "jsonwebtoken": "^9.0.2",
     "mysql2": "^3.6.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.9"
   }
 }

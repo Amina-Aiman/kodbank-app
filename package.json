@@ -1,0 +1,9 @@
+{
+  "name": "kodbank-app",
+  "private": true,
+  "scripts": {
+    "seed": "node backend/scripts/seed-data.js",
+    "backend": "cd backend && npm run dev",
+    "frontend": "cd frontend && npm run dev"
+  }
+}

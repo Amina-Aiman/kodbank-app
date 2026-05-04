@@ -1,0 +1,41 @@
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '.env') });
+const express = require('express');
+const cookieParser = require('cookie-parser');
+const cors = require('cors');
+const authRoutes = require('./routes/auth');
+const bankRoutes = require('./routes/bank');
+const aiRoutes = require('./routes/ai');
+
+const app = express();
+const PORT = process.env.PORT || 4000;
+const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || 'http://localhost:5173';
+const allowedOrigins = [FRONTEND_ORIGIN, 'http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175'].filter((o, i, a) => a.indexOf(o) === i);
+
+app.use(cors({
+  origin: (origin, cb) => (allowedOrigins.includes(origin) || !origin ? cb(null, true) : cb(null, false)),
+  credentials: true,
+}));
+app.use(express.json());
+app.use(cookieParser());
+
+app.use('/api/auth', authRoutes);
+app.use('/api/bank', bankRoutes);
+app.use('/api/ai', aiRoutes);
+
+app.get('/health', (req, res) => res.json({ status: 'ok' }));
+app.get('/api/ai/status', (req, res) => {
+  const key = (process.env.HUGGINGFACE_API_KEY || '').trim();
+  res.json({ configured: key.length > 0 });
+});
+
+app.use((err, req, res, next) => {
+  console.error('Server error:', err.stack || err.message || err);
+  res.status(500).json({ error: 'Internal server error.' });
+});
+
+app.listen(PORT, () => {
+  console.log(`Kodbank API running on http://localhost:${PORT}`);
+  const hasKey = !!(process.env.HUGGINGFACE_API_KEY || '').trim();
+  console.log(`AI chat: using Hugging Face router API (router.huggingface.co). Token: ${hasKey ? 'configured' : 'NOT set - add HUGGINGFACE_API_KEY in backend/.env with "Make calls to Inference Providers" permission'}`);
+});

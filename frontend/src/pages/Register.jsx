@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { register } from '../api';
+import { normalizeEmail } from '../utils/email';
 
 export default function Register() {
   const navigate = useNavigate();
@@ -26,7 +27,16 @@ export default function Register() {
     }
     setLoading(true);
     try {
-      await register({ name, email, password, confirmPassword, address, dateOfBirth });
+      const cleanedEmail = normalizeEmail(email);
+      setEmail(cleanedEmail);
+      await register({
+        name: name.trim(),
+        email: cleanedEmail,
+        password,
+        confirmPassword,
+        address,
+        dateOfBirth,
+      });
       navigate('/login', { state: { message: 'Account created. Please sign in with your email and password.' } });
     } catch (err) {
       setError(err.message || 'Registration failed');
@@ -59,6 +69,7 @@ export default function Register() {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              onBlur={(e) => setEmail(normalizeEmail(e.target.value))}
               placeholder="you@example.com"
               required
               autoComplete="email"

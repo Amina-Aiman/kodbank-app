@@ -3,6 +3,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { pool } = require('../db/pool');
 const { requireAuth } = require('../middleware/auth');
+const { normalizeEmail } = require('../utils/email');
 
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret';
@@ -19,14 +20,14 @@ const COOKIE_OPTIONS = {
 router.post('/register', async (req, res) => {
   try {
     const { name, email, password, confirmPassword, address, dateOfBirth } = req.body || {};
-    if (!name || !email || !password) {
+    const emailNorm = normalizeEmail(email);
+    if (!String(name).trim() || !emailNorm || !password) {
       return res.status(400).json({ error: 'Name, email and password are required.' });
     }
     if (password !== confirmPassword) {
       return res.status(400).json({ error: 'Password and confirm password do not match.' });
     }
     const hash = await bcrypt.hash(String(password), 10);
-    const emailNorm = String(email).trim().toLowerCase();
     const addressVal = address != null ? String(address).trim() : null;
     const dobVal = dateOfBirth != null ? String(dateOfBirth).trim() || null : null;
 
@@ -88,11 +89,11 @@ router.post('/register', async (req, res) => {
 router.post('/login', async (req, res) => {
   const email = req.body != null && req.body.email != null ? String(req.body.email) : '';
   const password = req.body != null && req.body.password != null ? String(req.body.password) : '';
-  if (!email.trim() || !password) {
+  const emailNorm = normalizeEmail(email);
+  if (!emailNorm || !password) {
     return res.status(400).json({ error: 'Email and password are required.' });
   }
   try {
-    const emailNorm = email.trim().toLowerCase().replace(/\s+/g, ' ');
     const passwordRaw = password;
     const passwordNorm = password.trim();
     const r = await pool.query(

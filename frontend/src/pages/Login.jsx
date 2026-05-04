@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { login } from '../api';
+import { normalizeEmail } from '../utils/email';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -24,7 +25,9 @@ export default function Login() {
     setError('');
     setLoading(true);
     try {
-      await login(email, password);
+      const cleanedEmail = normalizeEmail(email);
+      setEmail(cleanedEmail);
+      await login(cleanedEmail, password);
       navigate('/dashboard');
     } catch (err) {
       setError(err.message || 'Login failed');
@@ -47,6 +50,7 @@ export default function Login() {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              onBlur={(e) => setEmail(normalizeEmail(e.target.value))}
               placeholder="you@example.com"
               required
               autoComplete="email"

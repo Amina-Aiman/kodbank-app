@@ -62,7 +62,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginGate />} />
-      <Route path="/register" element={<PublicOnly><Register /></PublicOnly>} />
+      <Route path="/register" element={<Register />} />
       <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
       <Route path="/balance" element={<PrivateRoute><Balance /></PrivateRoute>} />
       <Route path="/transfer" element={<PrivateRoute><Transfer /></PrivateRoute>} />

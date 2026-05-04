@@ -73,8 +73,14 @@ if (USE_SQLITE) {
       const Cname = p[0];
       const email = p[1];
       const Cpwd = p[2];
-      // Auth uses VALUES (?, ?, ?, 500000, ?, ?) so params are [name, email, hash, address, dob]. p[3]=address, p[4]=dob.
-      const balanceVal = (typeof p[3] === 'number' && !isNaN(p[3])) ? p[3] : 500000;
+      /**
+       * MySQL registrations use literals for balance like:
+       * INSERT ... VALUES (?, ?, ?, 500000, ?, ?)
+       *
+       * So params from auth.register are strictly:
+       * [name, email, hash, address, dob]
+       */
+      const balanceVal = 500000;
       const address = p[3] != null ? String(p[3]).trim() || null : null;
       const dateOfBirth = p[4] != null ? String(p[4]).trim() || null : null;
       const emailNorm = email != null ? String(email).trim().toLowerCase().replace(/\s+/g, ' ') : '';

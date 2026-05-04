@@ -17,18 +17,19 @@ const COOKIE_OPTIONS = {
 
 // POST /api/auth/register
 router.post('/register', async (req, res) => {
-  const { name, email, password, confirmPassword, address, dateOfBirth } = req.body;
-  if (!name || !email || !password) {
-    return res.status(400).json({ error: 'Name, email and password are required.' });
-  }
-  if (password !== confirmPassword) {
-    return res.status(400).json({ error: 'Password and confirm password do not match.' });
-  }
-  const hash = await bcrypt.hash(password, 10);
-  const emailNorm = email.trim().toLowerCase();
-  const addressVal = address != null ? String(address).trim() : null;
-  const dobVal = dateOfBirth != null ? String(dateOfBirth).trim() || null : null;
   try {
+    const { name, email, password, confirmPassword, address, dateOfBirth } = req.body || {};
+    if (!name || !email || !password) {
+      return res.status(400).json({ error: 'Name, email and password are required.' });
+    }
+    if (password !== confirmPassword) {
+      return res.status(400).json({ error: 'Password and confirm password do not match.' });
+    }
+    const hash = await bcrypt.hash(String(password), 10);
+    const emailNorm = String(email).trim().toLowerCase();
+    const addressVal = address != null ? String(address).trim() : null;
+    const dobVal = dateOfBirth != null ? String(dateOfBirth).trim() || null : null;
+
     const r = await pool.query(
       'INSERT INTO `BankUser` (`Cname`, email, `Cpwd`, balance, address, dateOfBirth) VALUES (?, ?, ?, 500000, ?, ?)',
       [name.trim(), emailNorm, hash, addressVal, dobVal]
@@ -85,13 +86,14 @@ router.post('/register', async (req, res) => {
 
 // POST /api/auth/login — generates JWT, stores in DB, sets cookie
 router.post('/login', async (req, res) => {
-  const email = req.body.email != null ? String(req.body.email) : '';
-  const password = req.body.password != null ? String(req.body.password) : '';
+  const email = req.body != null && req.body.email != null ? String(req.body.email) : '';
+  const password = req.body != null && req.body.password != null ? String(req.body.password) : '';
   if (!email.trim() || !password) {
     return res.status(400).json({ error: 'Email and password are required.' });
   }
   try {
     const emailNorm = email.trim().toLowerCase().replace(/\s+/g, ' ');
+    const passwordRaw = password;
     const passwordNorm = password.trim();
     const r = await pool.query(
       'SELECT `Cid`, `Cname`, email, balance, `Cpwd`, lastLogin FROM `BankUser` WHERE email = ? ORDER BY `Cid` DESC',
@@ -112,7 +114,10 @@ router.post('/login', async (req, res) => {
     }
     let match = false;
     try {
-      match = await bcrypt.compare(passwordNorm, hash);
+      match = await bcrypt.compare(passwordRaw, hash);
+      if (!match && passwordNorm !== passwordRaw) {
+        match = await bcrypt.compare(passwordNorm, hash);
+      }
     } catch (_) {
       return res.status(401).json({ error: 'Invalid email or password.' });
     }

@@ -32,9 +32,9 @@ export default function TransactionHistory() {
           <ul className="transaction-list">
             {transactions.map((t, i) => (
               <li key={t.id} className={`transaction-item transaction-${t.type} ${i % 2 === 1 ? 'transaction-item-alt' : ''}`}>
-                <span className="tx-type">{t.type === 'sent' ? 'Sent' : 'Received'}</span>
+                <span className="tx-type">{t.type === 'sent' ? 'Debited' : 'Credited'}</span>
                 <span className="tx-party">{t.type === 'sent' ? `To ${t.toName}` : `From ${t.fromName}`}</span>
-                <span className="tx-amount">{t.type === 'sent' ? '-' : '+'}₹ {Number(t.amount).toLocaleString('en-IN')}</span>
+                <span className="tx-amount">₹ {Number(t.amount).toLocaleString('en-IN')}</span>
                 <span className="tx-date">
                   {t.createdAt ? new Date(t.createdAt).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' }) : '—'}
                 </span>

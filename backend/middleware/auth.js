@@ -26,14 +26,20 @@ async function requireAuth(req, res, next) {
     if (tokenRow.rows.length === 0) {
       return res.status(401).json({ error: 'Session expired or invalid. Please log in again.' });
     }
+    const tokenCidRaw = tokenRow.rows[0].Cid ?? tokenRow.rows[0].cid ?? decoded.cid;
+    const tokenCid = Number(tokenCidRaw);
+    if (!Number.isFinite(tokenCid)) {
+      return res.status(401).json({ error: 'Session invalid. Please log in again.' });
+    }
     const userRow = await pool.query(
       'SELECT `Cid`, `Cname`, email, balance, address, dateOfBirth FROM `BankUser` WHERE `Cid` = ?',
-      [decoded.cid]
+      [tokenCid]
     );
     if (userRow.rows.length === 0) {
       return res.status(401).json({ error: 'User not found.' });
     }
     req.user = userRow.rows[0];
+    req.authCid = tokenCid;
     next();
   } catch (err) {
     return res.status(500).json({ error: 'Authentication failed.' });

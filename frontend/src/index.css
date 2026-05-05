@@ -1571,6 +1571,57 @@ a:hover {
   flex: 1;
 }
 
+.transfer-receipt {
+  background: rgba(30, 58, 95, 0.06);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.transfer-receipt-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.transfer-receipt-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.transfer-receipt-time {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.transfer-receipt-amount {
+  font-family: var(--font-mono);
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+
+.transfer-receipt-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-top: 1px dashed var(--border);
+  font-size: 0.92rem;
+}
+
+.transfer-receipt-row span:first-child {
+  color: var(--text-muted);
+}
+
+.transfer-receipt-btn {
+  margin-top: 12px;
+}
+
 /* Chat with AI */
 .chat-card {
   display: flex;

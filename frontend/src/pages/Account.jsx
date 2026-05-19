@@ -14,6 +14,9 @@ export default function Account() {
 
   if (!user) return <div className="app-content">Loading…</div>;
 
+  const displayName = user.name || user.Cname || '—';
+  const displayEmail = user.email || '—';
+  const displayId = user.customer_id ?? user.Cid ?? '—';
   const lastLogin = user.lastLogin ? new Date(user.lastLogin) : null;
   const dob = user.dateOfBirth ? new Date(user.dateOfBirth) : null;
 
@@ -24,9 +27,9 @@ export default function Account() {
         <p className="sub">Your profile and account details</p>
         <dl className="account-details">
           <dt>Name</dt>
-          <dd>{user.name}</dd>
+          <dd>{displayName}</dd>
           <dt>Email</dt>
-          <dd>{user.email}</dd>
+          <dd>{displayEmail}</dd>
           {user.address && (
             <>
               <dt>Address</dt>
@@ -40,7 +43,7 @@ export default function Account() {
             </>
           )}
           <dt>Customer ID</dt>
-          <dd>{user.customer_id}</dd>
+          <dd>{displayId}</dd>
           {lastLogin && (
             <>
               <dt>Last login</dt>

@@ -179,13 +179,13 @@ router.post('/logout', async (req, res) => {
 
 // GET /api/auth/me — current user (validates JWT from cookie)
 router.get('/me', requireAuth, (req, res) => {
-  const u = req.user;
+  const u = req.user || {};
   res.json({
     user: {
-      customer_id: u.Cid,
-      name: u.Cname,
-      email: u.email,
-      balance: u.balance,
+      customer_id: u.Cid ?? u.cid ?? u.customer_id ?? null,
+      name: u.Cname ?? u.cname ?? u.name ?? '',
+      email: u.email ?? '',
+      balance: u.balance ?? 500000,
       lastLogin: u.lastLogin || u.last_login || null,
       address: u.address || null,
       dateOfBirth: u.dateOfBirth || u.date_of_birth || null,

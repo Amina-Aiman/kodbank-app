@@ -13,77 +13,27 @@ function shouldUseFileStore() {
 }
 
 const USE_SQLITE = shouldUseFileStore();
-const bundledDataPath = path.join(__dirname, '..', 'kodbank-data.json');
 const { normalizeEmail: normalizeStoredEmail } = require('../utils/email');
-
-function getDataPath() {
-  if (process.env.VERCEL || process.env.VERCEL_URL) {
-    return path.join('/tmp', 'kodbank-data.json');
-  }
-  return bundledDataPath;
-}
+const { loadPersistedData, savePersistedData } = require('./dataStore');
 
 if (USE_SQLITE) {
-  const dataPath = getDataPath();
+  let localCache = null;
 
-  function ensureDataFile() {
-    if (fs.existsSync(dataPath)) return;
-    if (dataPath !== bundledDataPath && fs.existsSync(bundledDataPath)) {
-      try {
-        fs.copyFileSync(bundledDataPath, dataPath);
-        return;
-      } catch (_) {}
+  async function getData() {
+    if (process.env.VERCEL || process.env.VERCEL_URL) {
+      return loadPersistedData();
     }
-    fs.writeFileSync(dataPath, JSON.stringify(emptyStore(), null, 2), 'utf8');
+    if (!localCache) {
+      localCache = await loadPersistedData();
+    }
+    return localCache;
   }
 
-  function emptyStore() {
-    return { users: [], tokens: [], transactions: [], nextCid: 1, nextTokenId: 1, nextTxId: 1 };
-  }
-
-  function readStoreAt(filePath) {
-    try {
-      const raw = fs.readFileSync(filePath, 'utf8');
-      const data = JSON.parse(raw);
-      if (!Array.isArray(data.transactions)) data.transactions = [];
-      if (!Array.isArray(data.users)) data.users = [];
-      data.users.forEach((u) => { if (u.lastLogin === undefined) u.lastLogin = null; });
-      return data;
-    } catch (e) {
-      return null;
+  async function flushData(data) {
+    if (!(process.env.VERCEL || process.env.VERCEL_URL)) {
+      localCache = data;
     }
-  }
-
-  function mergeStores(bundled, primary) {
-    const usersByEmail = new Map();
-    for (const u of bundled.users) {
-      const key = normalizeStoredEmail(u.email);
-      if (key) usersByEmail.set(key, u);
-    }
-    for (const u of primary.users) {
-      const key = normalizeStoredEmail(u.email);
-      if (key) usersByEmail.set(key, u);
-    }
-    const maxUserCid = Math.max(0, ...[...usersByEmail.values()].map((u) => Number(u.Cid) || 0));
-    return {
-      users: Array.from(usersByEmail.values()),
-      tokens: (primary.tokens && primary.tokens.length) ? primary.tokens : (bundled.tokens || []),
-      transactions: (primary.transactions && primary.transactions.length)
-        ? primary.transactions
-        : (bundled.transactions || []),
-      nextCid: Math.max(Number(primary.nextCid) || 1, Number(bundled.nextCid) || 1, maxUserCid + 1),
-      nextTokenId: Math.max(Number(primary.nextTokenId) || 1, Number(bundled.nextTokenId) || 1),
-      nextTxId: Math.max(Number(primary.nextTxId) || 1, Number(bundled.nextTxId) || 1),
-    };
-  }
-
-  function load() {
-    ensureDataFile();
-    const primary = readStoreAt(dataPath) || emptyStore();
-    if (dataPath === bundledDataPath) return primary;
-    const bundled = readStoreAt(bundledDataPath);
-    if (!bundled) return primary;
-    return mergeStores(bundled, primary);
+    await savePersistedData(data);
   }
 
   function findUsersByEmail(data, email) {
@@ -220,26 +170,30 @@ if (USE_SQLITE) {
 
   const pool = {
     async query(sql, params = []) {
-      const data = load();
+      const data = await getData();
       const result = runQuery(data, sql, params);
-      if (!sql.trim().toUpperCase().startsWith('SELECT')) save(data);
+      if (!sql.trim().toUpperCase().startsWith('SELECT')) {
+        await flushData(data);
+      }
       return result;
     },
     async getConnection() {
-      const data = load();
+      const data = await getData();
       return {
         async query(sql, params = []) {
           return runQuery(data, sql, params);
         },
         beginTransaction: () => {},
-        commit: () => save(data),
+        commit: async () => {
+          await flushData(data);
+        },
         rollback: () => {},
         release: () => {},
         _data: data,
       };
     },
     async recordTransaction(fromCid, toCid, amount, toName, fromName) {
-      const data = load();
+      const data = await getData();
       const id = (data.nextTxId = (data.nextTxId || 1) + 1) - 1;
       data.transactions.push({
         id,
@@ -250,10 +204,10 @@ if (USE_SQLITE) {
         fromName: fromName || '',
         createdAt: new Date().toISOString(),
       });
-      save(data);
+      await flushData(data);
     },
     async getTransactions(cid) {
-      const data = load();
+      const data = await getData();
       const list = (data.transactions || [])
         .filter((t) => t.fromCid === cid || t.toCid === cid)
         .map((t) => ({
@@ -269,7 +223,10 @@ if (USE_SQLITE) {
     },
   };
 
-  console.log('Using local file store at', dataPath);
+  const storeMode = process.env.BLOB_READ_WRITE_TOKEN
+    ? 'Vercel Blob + bundled seed'
+    : 'local JSON file store';
+  console.log('Using file store:', storeMode);
   module.exports = { pool };
 } else {
 const mysql = require('mysql2/promise');

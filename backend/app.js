@@ -13,7 +13,9 @@ const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:5174',
   'http://localhost:5175',
-].filter((o, i, a) => a.indexOf(o) === i);
+  process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null,
+  process.env.VERCEL_BRANCH_URL ? `https://${process.env.VERCEL_BRANCH_URL}` : null,
+].filter((o, i, a) => o && a.indexOf(o) === i);
 
 app.use(
   cors({

@@ -4,6 +4,8 @@
   "scripts": {
     "seed": "node backend/scripts/seed-data.js",
     "backend": "cd backend && npm run dev",
-    "frontend": "cd frontend && npm run dev"
+    "frontend": "cd frontend && npm run dev",
+    "vercel-install": "cd frontend && npm install && cd ../backend && npm install",
+    "vercel-build": "cd frontend && npm run build"
   }
 }

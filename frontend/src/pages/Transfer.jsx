@@ -42,7 +42,7 @@ export default function Transfer() {
       setRecipientName(r.name || 'Unknown');
       setStep(2);
     } catch (err) {
-      setError(err.message || 'Recipient not found.');
+      setError(err.message || 'Email not found.');
     } finally {
       setLoading(false);
     }

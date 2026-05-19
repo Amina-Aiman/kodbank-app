@@ -68,8 +68,8 @@ router.get('/recipient', requireAuth, async (req, res) => {
       'SELECT `Cid`, `Cname` FROM `BankUser` WHERE email = ?',
       [email]
     );
-    if (r.rows.length === 0) return res.status(404).json({ error: 'Recipient not found.' });
-    if (Number(r.rows[0].Cid) === fromId) return res.status(404).json({ error: 'Cannot send to yourself.' });
+    if (r.rows.length === 0) return res.status(404).json({ error: 'Email not found.' });
+    if (Number(r.rows[0].Cid) === fromId) return res.status(400).json({ error: 'Cannot send to yourself.' });
     res.json({ name: r.rows[0].Cname });
   } catch (err) {
     res.status(500).json({ error: 'Failed to look up recipient.' });
@@ -133,7 +133,7 @@ router.post('/transfer', requireAuth, async (req, res) => {
     );
     if (toRow.rows.length === 0) {
       await conn.rollback();
-      return res.status(404).json({ error: 'Recipient account not found.' });
+      return res.status(404).json({ error: 'Email not found.' });
     }
     const toId = toRow.rows[0].Cid;
     if (toId === fromId) {

@@ -14,6 +14,7 @@ function shouldUseFileStore() {
 
 const USE_SQLITE = shouldUseFileStore();
 const bundledDataPath = path.join(__dirname, '..', 'kodbank-data.json');
+const { normalizeEmail: normalizeStoredEmail } = require('../utils/email');
 
 function getDataPath() {
   if (process.env.VERCEL || process.env.VERCEL_URL) {
@@ -40,17 +41,73 @@ if (USE_SQLITE) {
     return { users: [], tokens: [], transactions: [], nextCid: 1, nextTokenId: 1, nextTxId: 1 };
   }
 
-  function load() {
-    ensureDataFile();
+  function readStoreAt(filePath) {
     try {
-      const raw = fs.readFileSync(dataPath, 'utf8');
+      const raw = fs.readFileSync(filePath, 'utf8');
       const data = JSON.parse(raw);
       if (!Array.isArray(data.transactions)) data.transactions = [];
+      if (!Array.isArray(data.users)) data.users = [];
       data.users.forEach((u) => { if (u.lastLogin === undefined) u.lastLogin = null; });
       return data;
     } catch (e) {
-      return emptyStore();
+      return null;
     }
+  }
+
+  function mergeStores(bundled, primary) {
+    const usersByEmail = new Map();
+    for (const u of bundled.users) {
+      const key = normalizeStoredEmail(u.email);
+      if (key) usersByEmail.set(key, u);
+    }
+    for (const u of primary.users) {
+      const key = normalizeStoredEmail(u.email);
+      if (key) usersByEmail.set(key, u);
+    }
+    const maxUserCid = Math.max(0, ...[...usersByEmail.values()].map((u) => Number(u.Cid) || 0));
+    return {
+      users: Array.from(usersByEmail.values()),
+      tokens: (primary.tokens && primary.tokens.length) ? primary.tokens : (bundled.tokens || []),
+      transactions: (primary.transactions && primary.transactions.length)
+        ? primary.transactions
+        : (bundled.transactions || []),
+      nextCid: Math.max(Number(primary.nextCid) || 1, Number(bundled.nextCid) || 1, maxUserCid + 1),
+      nextTokenId: Math.max(Number(primary.nextTokenId) || 1, Number(bundled.nextTokenId) || 1),
+      nextTxId: Math.max(Number(primary.nextTxId) || 1, Number(bundled.nextTxId) || 1),
+    };
+  }
+
+  function load() {
+    ensureDataFile();
+    const primary = readStoreAt(dataPath) || emptyStore();
+    if (dataPath === bundledDataPath) return primary;
+    const bundled = readStoreAt(bundledDataPath);
+    if (!bundled) return primary;
+    return mergeStores(bundled, primary);
+  }
+
+  function findUsersByEmail(data, email) {
+    const want = normalizeStoredEmail(email);
+    if (!want) return [];
+    return data.users.filter((u) => normalizeStoredEmail(u.email) === want);
+  }
+
+  function isLookupByEmail(sqlUpper) {
+    return (
+      sqlUpper.includes('BANKUSER')
+      && sqlUpper.includes('EMAIL')
+      && (sqlUpper.includes('EMAIL =') || sqlUpper.includes('EMAIL='))
+      && !sqlUpper.includes('BANKUSERJWT')
+    );
+  }
+
+  function isLookupByCid(sqlUpper) {
+    return (
+      sqlUpper.includes('BANKUSER')
+      && (sqlUpper.includes('WHERE CID =') || sqlUpper.includes('WHERE CID='))
+      && !sqlUpper.includes('EMAIL =')
+      && !sqlUpper.includes('EMAIL=')
+    );
   }
 
   function save(data) {
@@ -66,17 +123,17 @@ if (USE_SQLITE) {
         const token = data.tokens.find((t) => t.tokenvalue === p[0] && new Date(t.exp) > new Date());
         return { rows: token ? [{ Cid: token.Cid }] : [], insertId: undefined };
       }
-      if (s.includes('BANKUSER') && s.includes('EMAIL') && (s.includes('WHERE EMAIL') || s.includes('CPWD'))) {
-        const want = (p[0] != null ? String(p[0]).trim().toLowerCase() : '').replace(/\s+/g, ' ');
-        const user = data.users.find((u) => {
-          const stored = (u.email != null ? String(u.email).trim().toLowerCase() : '').replace(/\s+/g, ' ');
-          return stored === want;
-        });
-        if (user) {
-          const row = { Cid: user.Cid, Cname: user.Cname, email: user.email, balance: user.balance, Cpwd: user.Cpwd };
-          return { rows: [row], insertId: undefined };
-        }
-        return { rows: [], insertId: undefined };
+      if (isLookupByEmail(s)) {
+        const matches = findUsersByEmail(data, p[0]);
+        const rows = matches.map((user) => ({
+          Cid: user.Cid,
+          Cname: user.Cname,
+          email: user.email,
+          balance: user.balance,
+          Cpwd: user.Cpwd,
+          lastLogin: user.lastLogin,
+        }));
+        return { rows, insertId: undefined };
       }
       if (s.includes('BALANCE') && s.includes('BANKUSER')) {
         const user = data.users.find((u) => u.Cid === p[0] || u.Cid === Number(p[0]));
@@ -84,14 +141,9 @@ if (USE_SQLITE) {
         const num = (typeof raw === 'number' && Number.isFinite(raw)) ? raw : 500000;
         return { rows: user ? [{ balance: num }] : [], insertId: undefined };
       }
-      if (s.includes('BANKUSER') && s.includes('CID')) {
+      if (isLookupByCid(s)) {
         const user = data.users.find((u) => u.Cid === p[0] || u.Cid === Number(p[0]));
         return { rows: user ? [user] : [], insertId: undefined };
-      }
-      if (s.includes('CID') && s.includes('CNAME') && s.includes('BANKUSER') && s.includes('EMAIL')) {
-        const want = p[0] != null ? String(p[0]).trim().toLowerCase() : '';
-        const user = data.users.find((u) => (u.email || '').trim().toLowerCase() === want);
-        return { rows: user ? [{ Cid: user.Cid, Cname: user.Cname }] : [], insertId: undefined };
       }
       return { rows: [], insertId: undefined };
     }

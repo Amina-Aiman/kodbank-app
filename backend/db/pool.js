@@ -1,13 +1,47 @@
 require('dotenv').config();
 
-const USE_SQLITE = process.env.USE_SQLITE === '1' || process.env.USE_SQLITE === 'true';
+const path = require('path');
+const fs = require('fs');
+
+/** Local JSON store: explicit USE_SQLITE=1, or Vercel without MySQL env. */
+function shouldUseFileStore() {
+  if (process.env.USE_SQLITE === '1' || process.env.USE_SQLITE === 'true') return true;
+  if (process.env.USE_SQLITE === '0' || process.env.USE_SQLITE === 'false') return false;
+  const onVercel = !!(process.env.VERCEL || process.env.VERCEL_URL);
+  const hasMysql = !!(process.env.DATABASE_URL || (process.env.DB_HOST && process.env.DB_USER));
+  return onVercel && !hasMysql;
+}
+
+const USE_SQLITE = shouldUseFileStore();
+const bundledDataPath = path.join(__dirname, '..', 'kodbank-data.json');
+
+function getDataPath() {
+  if (process.env.VERCEL || process.env.VERCEL_URL) {
+    return path.join('/tmp', 'kodbank-data.json');
+  }
+  return bundledDataPath;
+}
 
 if (USE_SQLITE) {
-  const path = require('path');
-  const fs = require('fs');
-  const dataPath = path.join(__dirname, '..', 'kodbank-data.json');
+  const dataPath = getDataPath();
+
+  function ensureDataFile() {
+    if (fs.existsSync(dataPath)) return;
+    if (dataPath !== bundledDataPath && fs.existsSync(bundledDataPath)) {
+      try {
+        fs.copyFileSync(bundledDataPath, dataPath);
+        return;
+      } catch (_) {}
+    }
+    fs.writeFileSync(dataPath, JSON.stringify(emptyStore(), null, 2), 'utf8');
+  }
+
+  function emptyStore() {
+    return { users: [], tokens: [], transactions: [], nextCid: 1, nextTokenId: 1, nextTxId: 1 };
+  }
 
   function load() {
+    ensureDataFile();
     try {
       const raw = fs.readFileSync(dataPath, 'utf8');
       const data = JSON.parse(raw);
@@ -15,7 +49,7 @@ if (USE_SQLITE) {
       data.users.forEach((u) => { if (u.lastLogin === undefined) u.lastLogin = null; });
       return data;
     } catch (e) {
-      return { users: [], tokens: [], transactions: [], nextCid: 1, nextTokenId: 1, nextTxId: 1 };
+      return emptyStore();
     }
   }
 
